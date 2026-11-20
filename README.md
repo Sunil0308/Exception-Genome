@@ -1,148 +1,415 @@
-# Exception Genome · Phase 7
+# Exception Genome
 
-Synthetic operational exception investigation, governed execution, and independently verified incident closure. The [Phase 6 report](Phase_6_Report.md) contains both demo paths, the current project tree, and validation results.
+### Verified Autonomous Operations
 
-## Setup and run
+**Exception Genome** is a governed autonomous operational exception-resolution prototype built for the **OCBC IGNITE Innovation Challenge 2026 — Intelligent Operations: From Automation to Autonomous Resolution**.
 
-Python 3.10+ with dependencies installed:
+Instead of treating every operational exception as an isolated ticket, Exception Genome investigates whether multiple failures are actually symptoms of the same upstream problem.
 
-```powershell
-cd C:\Codex\OCBC
-python -m pip install -r requirements.txt
-python -m streamlit run app.py
-```
+## 23 Exceptions → 1 Root Cause → 1 Verified Remediation
 
-SQLite initialises and migrates automatically. Existing records are preserved. The application uses `data/operations.sqlite3`. Source archives exclude the runtime database so a fresh extraction starts healthy.
+In the flagship scenario, a single DataHub credential failure causes **23 downstream operational exceptions** across reporting, reconciliation, settlements and customer operations.
 
-## Project tree
+Exception Genome:
 
-See [Phase_6_Report.md](Phase_6_Report.md) for the current tree.
+1. Detects the operational exceptions
+2. Builds an Exception Genome for each failure
+3. Correlates related exceptions
+4. Identifies the most likely shared root cause
+5. Generates a Resolution Contract
+6. Applies a deterministic Safety Gate
+7. Tests the remediation in an Impact Sandbox
+8. Executes an approved simulated remediation
+9. Monitors service recovery
+10. Independently verifies the final state
+11. Stores verified outcomes in Operational Memory
 
-## Foundation cleanup
+> **Do not automate 23 tickets. Remove the reason the 23 tickets exist.**
 
-The connection context manager wraps the transaction and closes in `finally`, including rollback paths. Existing commit/rollback semantics are preserved. Command Centre rendering moved into `ui/command_centre.py`. The scenario dataclass owns source, change event, error templates, severity, failure rules and timing; `simulator/engine.py` owns generic descendant propagation. Existing `start()` and `advance()` imports remain valid.
-
-The 24-node topology is unchanged. DataHub and 22 descendants produce 23 active exceptions. Authentication Service remains healthy. First failure is 09:00:10, followed by eight-second simulated increments; UI ticks remain 0.7 seconds. Fixed scenario timestamps are synthetic, not current monitoring time.
-
-## Schema and migration
-
-`services`, `incidents`, and all original exception columns are preserved. `exceptions` gains:
-
-- `upstream_dependency` TEXT: common upstream change source when unambiguous.
-- `dependency_path` TEXT: JSON path from that source to the affected service.
-- `last_success_timestamp` TEXT.
-- `recent_change_event` TEXT: structured JSON change record.
-- `authentication_context` TEXT.
-- `retry_count` INTEGER, default 0.
-- `evidence_sources` TEXT: JSON source labels.
-- `genome_signature` TEXT: populated by analysis.
-
-Existing `business_impact` and `severity` remain unchanged. Migration checks `PRAGMA table_info` before adding columns. Existing rows receive context from recorded service state and graph where available; old free-text change records remain UNKNOWN rather than being presented as confirmed credential evidence. Reset and simulate again to generate the full new structured evidence.
-
-New tables:
-
-| Table | Key and contents |
-|---|---|
-| exception_genomes | exception_id FK/PK; complete genome JSON |
-| correlation_clusters | cluster id PK; incident FK; score, signals and cluster evidence JSON |
-| cluster_members | cluster/exception composite PK and foreign keys |
-| root_cause_analyses | cluster FK/PK; result JSON including confidence, alternatives and causal paths |
-
-Completed analysis writes these tables and DIAGNOSED status in one transaction. Reload/reinitialisation reuses saved results. Reset deletes children before parents. No execution or memory tables exist.
-
-## Fingerprints and normalization
-
-SHA-256 fingerprints encode normalized error family, graph roots, change source/type, five-minute scenario-time bucket and authentication context. Exception IDs are excluded. Hash equality is not the clustering test: related but distinct symptoms can have different hashes, with their shared features compared explicitly.
-
-Code prefixes map to families: AUTH → AUTHENTICATION_FAILURE; SRC/REF/CUS → UPSTREAM_DATA_UNAVAILABLE; REC/EXP → MISSING_SOURCE_DATA; SET → PROCESSING_BLOCKED; DEP → DEPENDENCY_FAILURE. Compatibility follows the upstream-to-downstream causal family table and the observed order of failures. Messages themselves are not compared.
-
-## Exact correlation formula
-
-For each pair, score = A + B + C + D + E (maximum 100):
-
-| Signal | Points |
-|---|---|
-| A — shared dependency | 35 if a shared graph root exists; otherwise 30 for a common direct dependency; otherwise 25 for a common ancestor; otherwise 0 |
-| B — temporal proximity | 20 for gap <=30s; 18 for <=90s; 15 for <=180s; otherwise 0 |
-| C — error relationship | 15 if a dependency path, event order and directional compatibility all support a causal link; otherwise 0 |
-| D — recent change | 20 for equal non-UNKNOWN structured changes, each occurring 0–600s before its exception; otherwise 0 |
-| E — graph direction | 10 when a common ancestor has an observed exception no later than both pair members; otherwise 0 |
-| F — historical similarity | NO_HISTORY; zero weight |
-
-Exceptions are processed in timestamp/ID order. A new member needs a witnessed common cause, a causal link to the earliest observed member scoring at least 75, and a time gap of at most 180 seconds to every member.
-
-A cluster score is the arithmetic mean of the pair scores from its earliest observed member to every other member. Signal breakdowns are averaged the same way. Singleton groups score 0. HIGH CORRELATION means >=90.
-
-Flagship calculation over 22 source-to-descendant pairs:
-
-- Shared dependency: 35
-- Timeline: (3×20 + 8×18 + 11×15) / 22 = 16.772727...
-- Error relationship: 15
-- Shared change: 20
-- Direction: 10
-- Total: 96.772727... / 100 (displayed 96.8)
-
-These values arise from the recorded timestamps and topology. There is no hardcoded final percentage.
-
-## Root-cause scoring
-
-Every service is ranked, including healthy Authentication Service. For N exception genomes and a candidate:
-
-- Topology = 35 × (self plus descendants covered) / N.
-- Timeline = 20 × (covered exceptions occurring at/after the candidate exception) / N, only if the candidate is an earliest observed failure; otherwise 0.
-- Change Event = 20 when the candidate has a known, timely change recorded against itself; otherwise 0.
-- Error Evidence = 15 × compatible covered exceptions / N, only when the candidate itself reports authentication failure; otherwise 0.
-- Contradictions = max(0, 8 − 4K), where K counts healthy candidate state, a preceding failure elsewhere, and incomplete topology coverage.
-
-Total divided by 100 produces the `confidence` field. A precise expired-credential conclusion additionally requires explicit CREDENTIAL_EXPIRED context and a timely CREDENTIAL_ROTATION_FAILED event. If absent, the conclusion is qualified and contradiction points lose another four, floored at zero.
-
-Flagship: 35 + 20 + 20 + 15 + 8 = 98. Absence of contradictions earns only 8/10 because observational consistency is not certainty. These are heuristic evidence scores, not statistical probabilities. The deterministic analyser implements an interface that a future LLM adapter could share; no external API is required.
+---
 
 ## Demo
 
-1. Launch and observe 24 healthy services and zero exceptions (use Reset if an old run is stored).
-2. Press Simulate Incident. Watch 23 exceptions propagate; Pause and Resume remain available.
-3. Observe the different raw errors. Root causes identified remains zero.
-4. After propagation finishes, press Analyse Exception Genomes. Status messages track analysis without artificial sleeps.
-5. Observe DIAGNOSED, one cluster and one root-cause candidate. Services stay affected; exceptions stay active.
-6. Open Exception Genome. Compare domain symptom cards, inspect a fingerprint, inspect signal scores and see the 23 → 1 → 1 summary.
-7. Inspect the directional analytical graph. DataHub is highlighted; all original edges remain.
-8. Open Incident Investigation for chronological events, evidence, candidate rankings, alternative explanations, contradictions and causal paths.
-9. Read the recommendation-only label. No execution control exists.
-10. Open Resolution Centre and follow the [Phase 4 demo](Phase_4_Report.md).
+![Exception Genome Analysis](assets/screenshots/exception-genome.png)
 
-## Tests
+The flagship scenario demonstrates:
 
-```powershell
-python -m unittest discover -s tests -v
-python -W error::ResourceWarning -m unittest discover -s tests -v
+```text
+23 operational exceptions
+        ↓
+1 correlated cluster
+        ↓
+DataHub API identified as shared root cause
+        ↓
+Resolution Contract
+        ↓
+Deterministic Safety Gate
+        ↓
+Impact Sandbox
+        ↓
+Controlled remediation
+        ↓
+Progressive service recovery
+        ↓
+Independent verification
+        ↓
+Incident resolved
 ```
 
-Coverage: unchanged Phase 1–2 lifecycle; 23 enriched exceptions; varied raw messages; deterministic signatures independent of IDs; graph ancestry; one 23-member cluster; score arithmetic; unrelated/distant exceptions rejected; missing-change penalty; DataHub ranking; healthy Authentication alternative; evidence and causal chains; missing-expiry qualification; contradictory timeline; persistence/idempotency; reset; early-analysis rejection; legacy migration; connection close/rollback; all analytical graph edges; absence of later-phase surfaces; Streamlit start/pause/resume/analyse/navigation/reset integration.
+---
 
-## Known limitations
+## Core Principle
 
-- One synthetic scenario and a single-user shared SQLite database. Concurrent demos are not supported.
-- Propagation ticks while Command Centre is open, preserving the original behaviour. Finish propagation there before navigating to investigation.
-- Analysis is fast; status messages are retained in the status panel but intentionally have no artificial delays.
-- Fixed family compatibility and heuristic weights are tailored to the demonstrated operations failure; not validated for production banking incidents.
-- Historical similarity is NO_HISTORY. The lab uses deterministic analysis, synthetic execution, and independent verification. See the Phase 5 report for the demo limits.
-- Evidence uses synthetic source labels, topology, timestamp and change records; it is not real telemetry. Healthy Authentication Service is an observed state, not a continuously sampled availability guarantee.
-- Legacy free-text evidence is not invented during migration. Exact diagnosis can be less confident until Reset creates a fresh structured run.
-- Fingerprint five-minute buckets may split similar hashes at boundaries; correlation uses exact time gaps rather than hash equality.
+Exception Genome separates **intelligence from authority**.
 
-## Validation result
+The reasoning layer may:
 
-See [Phase_6_Report.md](Phase_6_Report.md) for current validation.
+- interpret evidence
+- correlate failures
+- identify likely root causes
+- compare alternative hypotheses
+- recommend remediation
+- explain its reasoning
 
+It does **not** independently control:
 
-## Phase 7 API
+- safety approval
+- execution permission
+- simulation outcome
+- final verification
+- incident closure
 
-Install the shared dependencies from requirements.txt. Run Streamlit with
-`python -m streamlit run app.py` and the HTTP interface in a separate terminal with
-`python -m uvicorn api.main:app --host 127.0.0.1 --port 8000`.
+Those decisions remain governed by deterministic rules.
 
-Use the same EXCEPTION_GENOME_DB setting in both terminals if overriding the default database.
-See [API_CONTRACT.md](API_CONTRACT.md), [N8N_HANDOFF.md](N8N_HANDOFF.md) and
-[Phase_7_Report.md](Phase_7_Report.md) for configuration, demo sequences and limits.
+---
 
+## System Architecture
+
+```text
+Streamlit Command Centre
+        │
+        ▼
+Python Domain Services
+        │
+        ├── Exception Genome Engine
+        ├── Correlation Engine
+        ├── Root Cause Analysis
+        ├── Resolution Contract
+        ├── Safety Gate
+        ├── Impact Simulator
+        ├── Execution Engine
+        ├── Verification Engine
+        ├── Operational Memory
+        └── Prevention Engine
+        │
+        ▼
+FastAPI
+        │
+        ▼
+n8n Orchestration
+```
+
+### Technology Stack
+
+- **Python**
+- **Streamlit**
+- **FastAPI**
+- **SQLite**
+- **NetworkX**
+- **Plotly**
+- **n8n**
+- **Pytest**
+
+---
+
+## Orchestration Workflow
+
+![n8n Workflow](assets/screenshots/n8n-workflow.png)
+
+n8n coordinates the resolution lifecycle, but it does **not** decide whether an action is safe.
+
+The backend remains the source of truth for:
+
+- current workflow state
+- authority
+- safety decisions
+- execution readiness
+- verification status
+
+---
+
+## Resolution Contract
+
+Before any remediation can execute, Exception Genome freezes the operational decision into a structured **Resolution Contract** containing:
+
+- root-cause diagnosis
+- supporting evidence
+- proposed action
+- target
+- scope
+- expected outcome
+- rollback information
+- authority requirements
+
+The contract is protected by a SHA-256 hash.
+
+If safety-relevant information changes, previous approvals become stale and must be recalculated.
+
+---
+
+## Safety Gate
+
+![Safety Gate](assets/screenshots/safety-gate.png)
+
+The Safety Gate uses deterministic rules rather than allowing the reasoning layer to grant itself authority.
+
+Checks include:
+
+- approved action type
+- target alignment
+- evidence completeness
+- action scope
+- rollback availability
+- contract integrity
+- duplicate execution
+- current operational state
+
+Unsafe or higher-risk cases are routed to **Human Review**.
+
+---
+
+## Independent Verification
+
+![Verification](assets/screenshots/verification.png)
+
+A successful action does **not** automatically mean the incident is resolved.
+
+After remediation, Exception Genome independently checks whether expected service and operational states have actually recovered.
+
+```text
+Execution succeeded
+        ≠
+Incident resolved
+```
+
+The incident closes only after verification succeeds.
+
+If verification fails, the workflow can:
+
+- reopen the incident
+- perform rollback
+- escalate to human review
+
+---
+
+## Supported Scenarios
+
+The prototype is not limited to the flagship 23-exception scenario.
+
+It also supports:
+
+### Shared Root Cause
+Multiple operational exceptions originate from one upstream failure.
+
+### Isolated Failure
+A single service fails without sufficient evidence of a wider incident.
+
+### Multiple Concurrent Root Causes
+Separate exception clusters are assigned and resolved independently.
+
+### Ambiguous Evidence
+The system refuses to force a diagnosis when confidence is insufficient and can request additional evidence.
+
+### Human Review
+Higher-risk or inconclusive cases require reviewer authority before execution.
+
+### Verification Failure
+A remediation may execute successfully while the expected operational outcome remains incorrect.
+
+### Recurrence and Prevention
+Verified incident history is stored in Operational Memory. Repeated patterns can generate preventive recommendations.
+
+---
+
+## Operational Memory
+
+Resolved incidents can be stored as verified historical patterns containing:
+
+- previous root cause
+- previous remediation
+- evidence
+- similarity information
+- outcome
+- success or failure history
+
+Historical similarity can assist future investigations, but past success does **not** bypass current safety controls.
+
+---
+
+## Command Centre
+
+![Command Centre](assets/screenshots/command-centre.png)
+
+The Streamlit Command Centre provides visibility into:
+
+- service health
+- operational exceptions
+- dependency relationships
+- incident state
+- root-cause evidence
+- Resolution Contracts
+- Safety Gate decisions
+- execution progress
+- verification
+- human review
+- audit history
+- Operational Memory
+
+---
+
+## Running Locally
+
+### 1. Install dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+### 2. Start Streamlit
+
+```bash
+python -m streamlit run app.py
+```
+
+### 3. Start the FastAPI backend
+
+```bash
+python -m uvicorn api.main:app --host 127.0.0.1 --port 8000
+```
+
+FastAPI documentation is available locally at:
+
+```text
+http://127.0.0.1:8000/docs
+```
+
+### 4. Start n8n
+
+```bash
+npx n8n
+```
+
+Import the Exception Genome n8n workflow and connect it to:
+
+```text
+http://127.0.0.1:8000
+```
+
+---
+
+## Testing
+
+The completed prototype passed:
+
+```text
+57 / 57 core unit tests
+6 / 6 targeted FastAPI tests
+```
+
+Testing covers areas including:
+
+- correlation
+- diagnosis
+- safety
+- impact simulation
+- execution
+- idempotency
+- recovery
+- verification
+- rollback
+- evidence updates
+- multiple assignments
+- Operational Memory
+
+---
+
+## Documentation
+
+Additional technical documentation is available in:
+
+```text
+docs/
+├── API_CONTRACT.md
+├── N8N_HANDOFF.md
+├── Phase_4_Report.md
+├── Phase_5_Report.md
+├── Phase_6_Report.md
+└── Phase_7_Report.md
+```
+
+---
+
+## Prototype Scope
+
+This project is a **synthetic proof-of-concept**.
+
+It demonstrates an architecture for governed autonomous operational exception resolution.
+
+It does **not** claim:
+
+- access to OCBC systems
+- access to OCBC customer data
+- connection to live banking infrastructure
+- production readiness
+- real autonomous banking actions
+- replication of OCBC's internal architecture
+
+All banking services, incidents, events and operational data used in the prototype are synthetic.
+
+---
+
+## Why Synthetic Data?
+
+Real OCBC infrastructure and customer data are intentionally outside the challenge scope.
+
+The synthetic environment was designed to model structural properties relevant to operational incidents, including:
+
+- service dependencies
+- timestamps
+- error families
+- cascading failures
+- recent changes
+- isolated failures
+- multiple simultaneous root causes
+- incomplete evidence
+- remediation and recovery states
+
+The goal is to validate the **decision and governance architecture**, not reproduce OCBC's production environment.
+
+---
+
+## Future Production Direction
+
+A real implementation would require integration with existing enterprise systems such as:
+
+- observability and monitoring
+- service catalogues / CMDB
+- ITSM
+- identity and privileged access management
+- change management
+- approved automation/runbook platforms
+- production databases
+- high-availability infrastructure
+- enterprise audit and security controls
+
+A practical deployment strategy would begin in **shadow mode**, followed by human-approved low-risk actions before introducing bounded autonomous remediation.
+
+---
+
+## Disclaimer
+
+Exception Genome was developed as a synthetic prototype for an innovation challenge.
+
+It is not an official OCBC product and is not affiliated with, deployed by, or connected to OCBC production systems.
+
+No real customer or transaction data is used.
