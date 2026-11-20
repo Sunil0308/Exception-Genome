@@ -1,0 +1,790 @@
+{
+  "name": "Exception Genome - Autonomous Exception Resolution",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        48
+      ],
+      "id": "4fbe2535-57d9-4042-a3b9-028bc39c6151",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "url": "http://127.0.0.1:8000/health",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        224,
+        48
+      ],
+      "id": "a78b3d10-0926-48a8-8bc9-7df01fdabc8d",
+      "name": "Check Exception Genome API"
+    },
+    {
+      "parameters": {
+        "url": "http://127.0.0.1:8000/demo/scenarios",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        448,
+        48
+      ],
+      "id": "c7b2b9ce-1195-4106-94a1-77033dfcab5b",
+      "name": "Get Demo Scenarios"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:8000/demo/scenarios/INC-2026-001/start",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        896,
+        48
+      ],
+      "id": "eef66360-757b-432b-af78-d8bd1e6a5984",
+      "name": "Start DataHub Incident"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 4
+          },
+          "conditions": [
+            {
+              "id": "a33c1292-f8c5-4784-85f2-32a8e4840537",
+              "leftValue": "={{ $json.title }}",
+              "rightValue": "DataHub Credential Failure",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.4,
+      "position": [
+        672,
+        48
+      ],
+      "id": "b183650a-2b70-4655-84d5-aec3aacd21dd",
+      "name": "Select DataHub Scenario"
+    },
+    {
+      "parameters": {
+        "jsCode": "const start = $('Start DataHub Incident').first().json;\n\nreturn Array.from({ length: 23 }, (_, i) => ({\n  json: {\n    incident_id: start.id || start.incident_id,\n    tick: i + 1\n  }\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        48
+      ],
+      "id": "cec17cc8-6673-480c-ad52-a86a360529dd",
+      "name": "Create Propagation Ticks"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        1344,
+        48
+      ],
+      "id": "1c973423-b045-4222-91bf-a4a94348acab",
+      "name": "Propagation Loop"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'http://127.0.0.1:8000/demo/incidents/' + $json.incident_id + '/advance' }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1568,
+        96
+      ],
+      "id": "a015d946-ad62-4047-b143-fcc54e8b9763",
+      "name": "Advance Incident"
+    },
+    {
+      "parameters": {
+        "jsCode": "const start = $('Start DataHub Incident').first().json;\n\nreturn [\n  {\n    json: {\n      incident_id: start.id || start.incident_id\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1568,
+        -96
+      ],
+      "id": "d8c829c8-cd24-4b05-beca-4a381a20d78e",
+      "name": "Finish Propagation"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'http://127.0.0.1:8000/incidents/' + $json.incident_id + '/analyse' }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1792,
+        -96
+      ],
+      "id": "77c83f47-c7cf-4465-b24d-26bdc26624d8",
+      "name": "Analyse Exception Genomes"
+    },
+    {
+      "parameters": {
+        "url": "={{ 'http://127.0.0.1:8000/incidents/' + $('Finish Propagation').first().json.incident_id + '/workflow' }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        2016,
+        -96
+      ],
+      "id": "5b08d0c8-fc14-43de-8629-118800a3876e",
+      "name": "Get Workflow State"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "assignments",
+        "include": "allOtherFields",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1.1,
+      "position": [
+        2240,
+        -96
+      ],
+      "id": "6f80b2d2-027a-4f28-a440-9baf6491fbd6",
+      "name": "Split Assignments"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'http://127.0.0.1:8000/incidents/' + $('Finish Propagation').first().json.incident_id + '/assignments/' + $('Get Workflow State').first().json.assignments[0].assignment_id + '/contract' }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        2464,
+        -96
+      ],
+      "id": "ef49f379-8fcf-42fa-aa20-a905f885c82e",
+      "name": "Generate Resolution Contract"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'http://127.0.0.1:8000/incidents/' + $('Finish Propagation').first().json.incident_id + '/assignments/' + $('Get Workflow State').first().json.assignments[0].assignment_id + '/safety' }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        2688,
+        -96
+      ],
+      "id": "f10a9bd1-4c8b-40e5-a8d4-81f8b5c97251",
+      "name": "Evaluate Safety Gate"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 4
+          },
+          "conditions": [
+            {
+              "id": "6d4c9b4b-cf26-4cdf-8a12-2c3b06bd2aaa",
+              "leftValue": "={{ $json.decision }}",
+              "rightValue": "APPROVED",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        2912,
+        -96
+      ],
+      "id": "55a01755-fc19-43be-824b-67545f6ad948",
+      "name": "Safety Approved?"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'http://127.0.0.1:8000/incidents/' + $('Finish Propagation').first().json.incident_id + '/assignments/' + $('Get Workflow State').first().json.assignments[0].assignment_id + '/simulate-impact' }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        3136,
+        -192
+      ],
+      "id": "4798b7e5-a841-4c9c-b676-c7a1136fc44b",
+      "name": "Run Impact Simulation"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 4
+          },
+          "conditions": [
+            {
+              "id": "77edc880-6714-47df-a083-bcf2bbec6cd5",
+              "leftValue": "={{ $json.result }}",
+              "rightValue": "PASS",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        3360,
+        -192
+      ],
+      "id": "df8bce0c-1954-445c-a552-6f034b2f1d1e",
+      "name": "Impact Safe?"
+    },
+    {
+      "parameters": {
+        "url": "={{ 'http://127.0.0.1:8000/incidents/' + $('Finish Propagation').first().json.incident_id + '/workflow' }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        3584,
+        -288
+      ],
+      "id": "45fdaeb1-c89e-4188-91e5-fd6000c169bd",
+      "name": "Get Workflow State Again"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'http://127.0.0.1:8000/incidents/' + $('Finish Propagation').first().json.incident_id + '/assignments/' + $('Get Workflow State').first().json.assignments[0].assignment_id + '/execute' }}",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "contract_hash",
+              "value": "={{ $('Generate Resolution Contract').first().json.contract_hash }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        3792,
+        -288
+      ],
+      "id": "98330423-3b7b-425d-88ad-7f0848c01bfb",
+      "name": "Execute Controlled Remediation"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 4
+          },
+          "conditions": [
+            {
+              "id": "ccdf9517-d692-4a45-b0d0-e89fc9120a5f",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "AWAITING_VERIFICATION",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        4016,
+        -288
+      ],
+      "id": "e28c90ce-587d-4907-95a4-3f6d2bb7f0e9",
+      "name": "Recovery Complete?"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'http://127.0.0.1:8000/executions/' + $('Execute Controlled Remediation').first().json.execution_id + '/advance' }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        4240,
+        -192
+      ],
+      "id": "b2652c89-73d6-4323-a0a2-2813b6570728",
+      "name": "Advance Recovery"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'http://127.0.0.1:8000/executions/' + $('Execute Controlled Remediation').first().json.execution_id + '/verify' }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        4240,
+        -384
+      ],
+      "id": "749939a1-3241-42a0-88d0-446982bc323b",
+      "name": "Run Independent Verification"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 4
+          },
+          "conditions": [
+            {
+              "id": "16b5ce6a-1b60-47f2-ad9b-e8f5e006765d",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "VERIFIED",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        4464,
+        -384
+      ],
+      "id": "489a0171-0a46-46b1-b0a4-34d16c554731",
+      "name": "Verification Passed?"
+    },
+    {
+      "parameters": {
+        "url": "={{ 'http://127.0.0.1:8000/incidents/' + $('Finish Propagation').first().json.incident_id + '/workflow' }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        4688,
+        -480
+      ],
+      "id": "175533e9-5464-4712-826b-90c6bbf9bc32",
+      "name": "Get Final Incident State"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        3136,
+        0
+      ],
+      "id": "fdb5e858-17f9-4705-ac91-8c6d2997286e",
+      "name": "Human Review - Safety Blocked"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        3584,
+        -96
+      ],
+      "id": "2ff1cae8-a9a1-46e4-bbde-e15869fea82e",
+      "name": "Human Review - Impact Failed"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        4704,
+        -304
+      ],
+      "id": "ec93ab78-ffdf-4649-8ff0-3d1bed89f972",
+      "name": "Human Review - Verification Failed"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Check Exception Genome API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Exception Genome API": {
+      "main": [
+        [
+          {
+            "node": "Get Demo Scenarios",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Demo Scenarios": {
+      "main": [
+        [
+          {
+            "node": "Select DataHub Scenario",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Select DataHub Scenario": {
+      "main": [
+        [
+          {
+            "node": "Start DataHub Incident",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Start DataHub Incident": {
+      "main": [
+        [
+          {
+            "node": "Create Propagation Ticks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Propagation Ticks": {
+      "main": [
+        [
+          {
+            "node": "Propagation Loop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Propagation Loop": {
+      "main": [
+        [
+          {
+            "node": "Finish Propagation",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Advance Incident",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Advance Incident": {
+      "main": [
+        [
+          {
+            "node": "Propagation Loop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Finish Propagation": {
+      "main": [
+        [
+          {
+            "node": "Analyse Exception Genomes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyse Exception Genomes": {
+      "main": [
+        [
+          {
+            "node": "Get Workflow State",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Workflow State": {
+      "main": [
+        [
+          {
+            "node": "Split Assignments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Assignments": {
+      "main": [
+        [
+          {
+            "node": "Generate Resolution Contract",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Resolution Contract": {
+      "main": [
+        [
+          {
+            "node": "Evaluate Safety Gate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Evaluate Safety Gate": {
+      "main": [
+        [
+          {
+            "node": "Safety Approved?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Safety Approved?": {
+      "main": [
+        [
+          {
+            "node": "Run Impact Simulation",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Human Review - Safety Blocked",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run Impact Simulation": {
+      "main": [
+        [
+          {
+            "node": "Impact Safe?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Impact Safe?": {
+      "main": [
+        [
+          {
+            "node": "Get Workflow State Again",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Human Review - Impact Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Workflow State Again": {
+      "main": [
+        [
+          {
+            "node": "Execute Controlled Remediation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Controlled Remediation": {
+      "main": [
+        [
+          {
+            "node": "Recovery Complete?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recovery Complete?": {
+      "main": [
+        [
+          {
+            "node": "Run Independent Verification",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Advance Recovery",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Advance Recovery": {
+      "main": [
+        [
+          {
+            "node": "Recovery Complete?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run Independent Verification": {
+      "main": [
+        [
+          {
+            "node": "Verification Passed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verification Passed?": {
+      "main": [
+        [
+          {
+            "node": "Get Final Incident State",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Human Review - Verification Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "da247557-9882-48bc-a118-1878d6fc3555",
+  "meta": {
+    "instanceId": "adf96f29a977d5504354f76214b69003c7ac9031b0fb9e869a5ba7505ff54b90"
+  },
+  "nodeGroups": [],
+  "id": "l4li6Li85tAe1Mwq",
+  "tags": []
+}
