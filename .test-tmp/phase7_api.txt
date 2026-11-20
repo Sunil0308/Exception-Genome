@@ -1,0 +1,13 @@
+C:\Users\sudha\AppData\Local\Programs\KNIME\bundling\.pixi-cache\uv-cache\archive-v0\J5W7TZ3y_7zLnSRZ\fastapi\testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+  from starlette.testclient import TestClient as TestClient  # noqa
+test_correlated_cluster_and_singleton_close_independently (test_phase7.ApiWorkflowTests.test_correlated_cluster_and_singleton_close_independently) ... ok
+test_datahub_workflow_and_memory (test_phase7.ApiWorkflowTests.test_datahub_workflow_and_memory) ... ok
+test_evidence_changes_ambiguous_diagnosis (test_phase7.ApiWorkflowTests.test_evidence_changes_ambiguous_diagnosis) ... ok
+test_health_auth_and_stale_contract (test_phase7.ApiWorkflowTests.test_health_auth_and_stale_contract) ... ok
+test_isolated_and_concurrent_review_workflows (test_phase7.ApiWorkflowTests.test_isolated_and_concurrent_review_workflows) ... ok
+test_verification_failure_and_rollback_are_visible (test_phase7.ApiWorkflowTests.test_verification_failure_and_rollback_are_visible) ... ok
+
+----------------------------------------------------------------------
+Ran 6 tests in 20.005s
+
+OK
