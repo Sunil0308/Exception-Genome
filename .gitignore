@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+
+# Secrets
+.env
+.env.*
+*.key
+*.pem
+
+# Local databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Temporary build/test files
+.test-tmp/
+.transfer-phase*/
+*.zip
+test_results.txt
+ui_test_output.txt
+
+# n8n local runtime
+.n8n/
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
